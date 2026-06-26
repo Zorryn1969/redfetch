@@ -169,7 +169,6 @@ def initialize_config():
         merge_enabled=True,
         lazy_load=True,
         environments=True,
-        validate_on_update=True,
         validators=[
             Validator("DOWNLOAD_FOLDER", cast=normalize_and_create_path),
             # Separate validator for EQPATH to avoid triggering eqgame.exe check
