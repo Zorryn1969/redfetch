@@ -10,6 +10,8 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
+    outputs:
+      wheel-name: ${{ steps.find_wheel.outputs.wheel }}
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -31,8 +33,67 @@ jobs:
       - name: Build Package
         run: hatch build
 
-      - name: Upload Build Artifacts
+      - name: Find Wheel
+        id: find_wheel
+        run: echo "wheel=$(ls dist/*.whl)" >> $GITHUB_OUTPUT
+
+      - name: Upload Wheel Artifact
         uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
+
+  build-exe:
+    needs: build-and-test
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Download Wheel Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Set Up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Set Up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Install 7-Zip
+        run: choco install 7zip --no-progress -y
+
+      - name: Download PyApp Source
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://github.com/ofek/pyapp/releases/latest/download/source.zip -OutFile pyapp-source.zip
+          7z x pyapp-source.zip -o"./pyapp-source"
+          $dir = Get-ChildItem -Path .\pyapp-source\ -Directory | Select-Object -First 1
+          Move-Item -Path $dir.FullName -Destination pyapp-latest
+
+      - name: Build PyApp Executable
+        shell: pwsh
+        working-directory: .\pyapp-latest
+        run: |
+          $wheel = Get-ChildItem -Path ..\dist\*.whl | Select-Object -First 1
+          $env:PYAPP_PROJECT_PATH = $wheel.FullName
+          $env:PYAPP_PROJECT_NAME = "redfetch"
+          $env:PYAPP_EXEC_MODULE = "redfetch.main"
+          $env:PYAPP_PASS_LOCATION = "1"
+          cargo build --release
+
+      - name: Rename Executable
+        shell: pwsh
+        run: Move-Item .\pyapp-latest\target\release\pyapp.exe redfetch.exe
+
+      - name: Upload Executable Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: redfetch.exe
+          path: redfetch.exe
