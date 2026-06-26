@@ -1199,8 +1199,9 @@ class Redfetch(App):
         self.theme = saved_theme
 
         # Initialize reactive state from config
-        self.download_folder = config.settings.from_env(self.current_env).DOWNLOAD_FOLDER or ""
-        self.eq_path = config.settings.from_env(self.current_env).EQPATH or ""
+        with config.settings.using_env(self.current_env):
+            self.download_folder = config.settings.DOWNLOAD_FOLDER or ""
+            self.eq_path = config.settings.EQPATH or ""
 
         # Set app title
         self.title = "  redfetch"
